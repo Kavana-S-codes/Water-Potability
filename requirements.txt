@@ -6,3 +6,4 @@ pandas
 shap 
 matplotlib
 fpdf2
+folium
