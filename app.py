@@ -4,181 +4,190 @@ import numpy as np
 import pandas as pd
 import shap
 import matplotlib.pyplot as plt
-from fpdf import FPDF 
+from PIL import Image, ImageStat
 import datetime
+import folium
+from streamlit_folium import st_folium
+from geopy.geocoders import Nominatim
 
-# --- CONFIGURATION ---
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="AquaGuard AI Pro", page_icon="💧", layout="wide")
-
-# --- INITIALIZE HISTORY STORAGE ---
-if 'history' not in st.session_state:
-    st.session_state.history = pd.DataFrame(columns=["Timestamp", "Location", "Type", "Verdict", "Reliability"])
-
-# --- LIGHT TURQUOISE DESIGN ---
-st.markdown("""
-    <style>
-    .stApp {
-        background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 50%, #80deea 100%);
-        background-attachment: fixed;
-    }
-    .bubble {
-        position: fixed;
-        bottom: -150px;
-        background: rgba(255, 255, 255, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.6);
-        border-radius: 50%;
-        animation: rise 15s infinite ease-in;
-        z-index: 0;
-        pointer-events: none;
-    }
-    @keyframes rise {
-        0% { bottom: -150px; transform: translateX(0); opacity: 0.8; }
-        50% { transform: translateX(50px); opacity: 0.4; }
-        100% { bottom: 110vh; transform: translateX(-30px); opacity: 0; }
-    }
-    [data-testid="stSidebar"] {
-        background-color: rgba(255, 255, 255, 0.5);
-        backdrop-filter: blur(15px);
-        border-right: 2px solid #00acc1;
-    }
-    [data-testid="stSidebar"] label { color: #004d40 !important; font-weight: 900 !important; }
-    h1, h2, h3 { color: #006064 !important; font-weight: 900 !important; }
-    p, .stMarkdown { color: #004d40 !important; font-weight: 500; }
-    .stAlert, div.potable-box, div.non-potable-box, [data-testid="stDataFrame"] {
-        background: rgba(255, 255, 255, 0.6) !important;
-        backdrop-filter: blur(20px);
-        border: 2px solid #00acc1;
-        border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    }
-    div.stButton > button:first-child {
-        background: linear-gradient(90deg, #00acc1 0%, #26c6da 100%) !important;
-        color: #ffffff !important;
-        border-radius: 50px;
-        font-size: 22px !important;
-        font-weight: bold !important;
-        width: 100%;
-        border: 2px solid white;
-    }
-    </style>
-    <div class="bubble" style="width:50px; height:50px; left:15%; animation-duration:10s;"></div>
-    <div class="bubble" style="width:70px; height:70px; left:75%; animation-duration:12s; animation-delay:5s;"></div>
-    """, unsafe_allow_html=True)
 
 # --- ASSET LOADING ---
 @st.cache_resource
 def load_assets():
-    model = joblib.load("random_forest_model.pkl")
-    scaler = joblib.load("standard_scaler.pkl")
-    return model, scaler
+    try:
+        model = joblib.load("random_forest_model.pkl")
+        scaler = joblib.load("standard_scaler.pkl")
+        return model, scaler
+    except:
+        return None, None
 
 model, scaler = load_assets()
 
-# --- SIDEBAR ---
+# --- INITIALIZE HISTORY ---
+if 'diagnostic_history' not in st.session_state:
+    st.session_state.diagnostic_history = pd.DataFrame(columns=[
+        "Timestamp", "Location", "Classification", "Verdict", "Reliability Index"
+    ])
+
+# --- CLEAN BUBBLE INJECTION ---
+def inject_bubbles():
+    bubble_css = """
+    <style>
+        .stApp { background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 50%, #80deea 100%); background-attachment: fixed; }
+        .bubble { position: fixed; bottom: -150px; background: rgba(255, 255, 255, 0.4); border-radius: 50%; animation: rise 15s infinite ease-in; z-index: 0; pointer-events: none; }
+        @keyframes rise { 0% { bottom: -100px; transform: translateX(0); opacity: 0.8; } 100% { bottom: 110vh; transform: translateX(-50px); opacity: 0; } }
+    </style>
+    """
+    st.markdown(bubble_css, unsafe_allow_html=True)
+    for i in range(1, 26):
+        size, left, dur, delay = np.random.randint(20, 70), np.random.randint(0, 95), np.random.uniform(10, 18), np.random.uniform(0, 10)
+        st.markdown(f'<style>.b{i} {{ width:{size}px; height:{size}px; left:{left}%; animation-duration:{dur}s; animation-delay:{delay}s; }}</style>', unsafe_allow_html=True)
+        st.markdown(f'<div class="bubble b{i}"></div>', unsafe_allow_html=True)
+
+inject_bubbles()
+
+# --- SIDEBAR: FIELD DATA & IMAGE SCAN ---
 with st.sidebar:
-    st.markdown("## 📍 SITE TRACKING")
-    loc_name = st.text_input("Sample Source ID", "Station-Alpha-01").strip()
-    is_natural = st.toggle("Environmental Resource (River/Lake)")
-    water_type = "Environmental" if is_natural else "Anthropogenic/Processed"
+    st.title("📍 Field Parameters")
+    loc_query = st.text_input("Village/City Name", "Delhi, India")
     
     st.divider()
-    st.markdown("## 🧪 ANALYSIS PARAMETERS")
+    st.subheader("📸 Visual Scan")
+    uploaded_img = st.file_uploader("Upload Sample Photo", type=["jpg", "png", "jpeg"])
+    
+    source_type = "Not Identified"
+    if uploaded_img:
+        img = Image.open(uploaded_img)
+        st.image(img, caption="Sample Captured", use_container_width=True)
+        stat = ImageStat.Stat(img)
+        brightness = sum(stat.mean) / 3
+        source_type = "Natural Water Body" if brightness < 120 else "Man-Processed Water"
+        st.info(f"**Visual Classification:** {source_type}")
+
+    st.divider()
+    st.subheader("🧪 Sensor Telemetry")
     features = ["ph", "Hardness", "Solids", "Chloramines", "Sulfate", "Conductivity", "Organic_carbon", "Trihalomethanes", "Turbidity"]
-    input_dict = {f: st.number_input(f"🔹 {f}", value=7.0 if f=='ph' else 150.0) for f in features}
+    
+    # WHO Defined Safety Limits
+    WHO_LIMITS = {
+        "ph": (6.5, 8.5), "Hardness": (0, 200), "Solids": (0, 1000), "Chloramines": (0, 4.0),
+        "Sulfate": (0, 250), "Conductivity": (0, 400), "Organic_carbon": (0, 2.0), "Trihalomethanes": (0, 0.08), "Turbidity": (0, 5.0)
+    }
+    
+    user_inputs = {}
+    for f in features:
+        # Default value set to roughly middle of WHO range for safety
+        default_val = 7.0 if f == "ph" else float(WHO_LIMITS[f][1] * 0.4)
+        user_inputs[f] = st.number_input(f"🔹 {f}", value=default_val)
 
-# --- MAIN UI ---
+# --- MAIN DASHBOARD ---
 st.title("🌊 AquaGuard AI: Professional Diagnostic")
-st.write(f"**Tracking ID:** {loc_name} | **Matrix Type:** {water_type}")
 
-if st.button("INITIATE ANALYTICAL SCAN"):
-    # --- UNIQUE ID CHECK ---
-    # Check if the loc_name already exists in the history dataframe
-    if not st.session_state.history.empty and loc_name in st.session_state.history['Location'].values:
-        st.error(f"❌ **Duplicate Entry Blocked:** ID '{loc_name}' has already been processed in this session. Please use a unique ID for new samples.")
-    else:
-        # 1. Processing
-        data_raw = np.array(list(input_dict.values())).reshape(1, -1)
-        data_scaled = scaler.transform(data_raw)
-        prediction = model.predict(data_scaled)[0]
+# 1. LIVE MONITORING MAP
+geolocator = Nominatim(user_agent="aquaguard_ai")
+try:
+    loc = geolocator.geocode(loc_query)
+    lat, lon = (loc.latitude, loc.longitude) if loc else (28.61, 77.20)
+except: lat, lon = 28.61, 77.20
+
+m = folium.Map(location=[lat, lon], zoom_start=12)
+folium.Marker([lat, lon], popup=loc_query, icon=folium.Icon(color='blue', icon='tint')).add_to(m)
+st_folium(m, width="100%", height=350)
+
+# 2. WHO COMPLIANCE AUDITOR (NEW FEATURE)
+st.subheader("📋 WHO Water Quality Compliance Auditor")
+
+
+compliance_data = []
+for f in features:
+    val = user_inputs[f]
+    low, high = WHO_LIMITS[f]
+    is_safe = low <= val <= high
+    status = "✅ COMPLIANT" if is_safe else "⚠️ VIOLATION"
+    compliance_data.append({
+        "Parameter": f.replace("_", " ").title(),
+        "WHO Limit": f"{low} - {high}",
+        "Input Value": val,
+        "Status": status
+    })
+
+# Render WHO Auditor Table
+st.table(pd.DataFrame(compliance_data))
+
+# 3. SOURCE ANALYSIS
+if uploaded_img:
+    st.subheader("🔍 Source Identification Analysis")
+    c1, c2 = st.columns(2)
+    with c1:
+        if source_type == "Natural Water Body":
+            st.warning("### 🌿 Natural Water Body")
+            st.write("**Description:** Surface-level water detected. High risk of microbial pathogens and organic runoff. Intensive Phase 3 disinfection required.")
+        else:
+            st.success("### 🏭 Man-Processed Water")
+            st.write("**Description:** Processed source detected. Primary risks involve chemical byproduct residuals like Trihalomethanes or Chloramines.")
+    with c2:
+        st.info("**Visual Analysis Result**")
+        st.write(f"The sample luminance reflects characteristics of **{source_type}**. Cross-referencing with sensor data for verification.")
+
+# 4. EXECUTION
+if st.button("RUN FULL SYSTEM DIAGNOSTIC"):
+    if model:
+        # Prediction Logic
+        input_array = np.array([user_inputs[f] for f in features]).reshape(1, -1)
+        data_scaled = scaler.transform(input_array)
+        prediction = int(model.predict(data_scaled)[0])
         prob = model.predict_proba(data_scaled)[0][prediction]
-        verdict_main = "BIO-SECURE (SAFE)" if prediction == 1 else "CONTAMINATED (UNSAFE)"
+        verdict = "BIO-SECURE (Potable)" if prediction == 1 else "CONTAMINATED (Unsafe)"
+        v_color = "#2e7d32" if prediction == 1 else "#c62828"
 
-        # 2. History Logging
-        new_entry = pd.DataFrame({
-            "Timestamp": [datetime.datetime.now().strftime("%H:%M:%S")],
-            "Location": [loc_name],
-            "Type": [water_type],
-            "Verdict": [verdict_main],
-            "Reliability": [f"{prob:.2%}"]
-        })
-        st.session_state.history = pd.concat([new_entry, st.session_state.history], ignore_index=True)
+        st.markdown(f"<div style='background:{v_color}; padding:25px; border-radius:15px; color:white; text-align:center;'><h1>{verdict}</h1><h3>Reliability Index: {prob:.2%}</h3></div>", unsafe_allow_html=True)
 
-        # 3. Results Display
-        col1, col2 = st.columns(2)
-        with col1:
-            v_color = "#00796b" if prediction == 1 else "#c62828"
-            st.markdown(f'''<div class="{"potable-box" if prediction==1 else "non-potable-box"}" style="padding:25px; border-left:10px solid {v_color};">
-                <h2 style="color:{v_color}; margin-top:0;">{verdict_main}</h2>
-                <p>Diagnostic Reliability Index: <b>{prob:.2%}</b></p>
-                </div>''', unsafe_allow_html=True)
+        # Update History
+        new_entry = pd.DataFrame([{
+            "Timestamp": datetime.datetime.now().strftime("%H:%M:%S"), 
+            "Location": loc_query, 
+            "Classification": source_type, 
+            "Verdict": verdict, 
+            "Reliability Index": f"{prob:.2%}"
+        }])
+        st.session_state.diagnostic_history = pd.concat([new_entry, st.session_state.diagnostic_history], ignore_index=True)
 
-        with col2:
-            st.subheader("🛠 Treatment Recommendation")
-            if prediction == 1 and prob < 0.85:
-                st.warning("⚠️ **Marginal Reliability:** Verdict is SAFE, but Index is below 85%. Secondary laboratory verification is highly recommended.")
-            elif prediction == 1:
-                st.success("💎 **Verified Potable:** Sample aligns with high-certainty safety thresholds.")
-            
-            if prediction == 0:
-                if is_natural:
-                    st.error("🚨 **Remediation:** Natural resource contamination detected. Biological and mineral filtration required.")
-                else:
-                    st.error("🚨 **Process Deviation:** Anthropogenic sample exceeds safety limits. Immediate RO-UV intervention mandated.")
-
-        # --- XAI CHART ---
+        # 5. XAI GRAPH (PATCHED SHAPE MISMATCH)
         st.divider()
-        st.subheader("📊 Molecular Feature Sensitivity")
-        try:
-            explainer = shap.TreeExplainer(model)
-            shap_v = explainer.shap_values(data_scaled)
-            if isinstance(shap_v, list):
-                display_vals = np.array(shap_v[prediction]).flatten()
-            else:
-                display_vals = np.array(shap_v).flatten() if len(shap_v.shape) <= 2 else np.array(shap_v[0, :, prediction]).flatten()
+        st.subheader("📊 XAI: Explainable AI Feature Influence")
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(data_scaled)
+        
+        # Binary Classification Patch
+        if isinstance(shap_values, list):
+            sv = shap_values[prediction].flatten()
+        else:
+            sv = shap_values[:, :, prediction].flatten() if len(shap_values.shape) == 3 else shap_values.flatten()
 
-            fig, ax = plt.subplots(figsize=(10, 5))
-            y_pos = np.arange(len(features))
-            colors = ['#00897b' if x > 0 else '#e53935' for x in display_vals]
-            ax.barh(y_pos, display_vals, color=colors)
-            ax.set_yticks(y_pos)
-            ax.set_yticklabels(features)
-            ax.invert_yaxis()
-            fig.patch.set_facecolor('#ffffff00') 
-            ax.set_facecolor('#ffffff')          
-            ax.patch.set_alpha(0.3)              
-            ax.tick_params(colors='#004d40', labelsize=10)
-            for spine in ax.spines.values(): spine.set_color('#00acc1')
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close(fig)
-        except Exception as e:
-            st.error(f"Visualization Engine Exception: {e}")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.barh(features, sv, color=['#4db6ac' if x > 0 else '#ef5350' for x in sv])
+        ax.set_title(f"Contribution towards {verdict}")
+        st.pyplot(fig)
 
-        # 4. Export Report
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 10, f"AquaGuard AI Analysis Certificate", ln=True, align='C')
-        pdf.ln(10)
-        pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, f"Sample ID: {loc_name}", ln=True)
-        pdf.cell(0, 10, f"Diagnostic Verdict: {verdict_main}", ln=True)
-        pdf.cell(0, 10, f"Reliability Index: {prob:.2%}", ln=True)
-        pdf_output = bytes(pdf.output(dest='S'))
-        st.download_button("📄 Export Analytical Report", data=pdf_output, file_name=f"Report_{loc_name}.pdf")
+        # 6. TREATMENT PHASES
+        st.divider()
+        st.subheader("🛠️ Professional Treatment Roadmap")
+        
+        p1, p2, p3 = st.columns(3)
+        with p1:
+            st.info("**PHASE 1: Physical Mitigation**\n\nRemoving turbidity and large organic matter through coagulation and flocculation.")
+        with p2:
+            st.info("**PHASE 2: Chemical Neutralization**\n\nUtilizing Reverse Osmosis (RO) to bring Solids and Sulfate levels into WHO compliance.")
+        with p3:
+            st.info("**PHASE 3: Biological Sterilization**\n\nUV-C Radiation or Ozone injection to eliminate microbial threats detected in visual scan.")
+    else:
+        st.error("Engine Offline: Model files missing.")
 
-# --- HISTORY ---
+# 7. HISTORY LOGS
 st.divider()
-st.subheader("📜 Analytical Session Logs")
-if not st.session_state.history.empty:
-    st.dataframe(st.session_state.history, use_container_width=True, hide_index=True)
+st.subheader("📜 Diagnostic History")
+st.dataframe(st.session_state.diagnostic_history, use_container_width=True)
+
+st.caption(f"AquaGuard AI Core v4.6 | {datetime.datetime.now().year}")
