@@ -6,4 +6,7 @@ pandas
 shap 
 matplotlib
 fpdf2
-folium
+Pillow
+folium 
+streamlit-folium
+geopy
