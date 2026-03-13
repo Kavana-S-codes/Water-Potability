@@ -11,7 +11,7 @@ from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="AquaGuard AI Pro", page_icon="💧", layout="wide")
+st.set_page_config(page_title="AquaMetric AI Pro", page_icon="💧", layout="wide")
 
 # --- ASSET LOADING ---
 @st.cache_resource
@@ -52,11 +52,11 @@ inject_bubbles()
 with st.sidebar:
     st.title("📍 Field Parameters")
     loc_query = st.text_input("Village/City Name", "Delhi, India")
-    
+
     st.divider()
     st.subheader("📸 Visual Scan")
     uploaded_img = st.file_uploader("Upload Sample Photo", type=["jpg", "png", "jpeg"])
-    
+
     source_type = "Not Identified"
     if uploaded_img:
         img = Image.open(uploaded_img)
@@ -69,13 +69,13 @@ with st.sidebar:
     st.divider()
     st.subheader("🧪 Sensor Telemetry")
     features = ["ph", "Hardness", "Solids", "Chloramines", "Sulfate", "Conductivity", "Organic_carbon", "Trihalomethanes", "Turbidity"]
-    
+
     # WHO Defined Safety Limits
     WHO_LIMITS = {
         "ph": (6.5, 8.5), "Hardness": (0, 200), "Solids": (0, 1000), "Chloramines": (0, 4.0),
         "Sulfate": (0, 250), "Conductivity": (0, 400), "Organic_carbon": (0, 2.0), "Trihalomethanes": (0, 0.08), "Turbidity": (0, 5.0)
     }
-    
+
     user_inputs = {}
     for f in features:
         # Default value set to roughly middle of WHO range for safety
@@ -83,10 +83,10 @@ with st.sidebar:
         user_inputs[f] = st.number_input(f"🔹 {f}", value=default_val)
 
 # --- MAIN DASHBOARD ---
-st.title("🌊 AquaGuard AI: Professional Diagnostic")
+st.title("🌊 AquaMetric AI: Professional Diagnostic")
 
 # 1. LIVE MONITORING MAP
-geolocator = Nominatim(user_agent="aquaguard_ai")
+geolocator = Nominatim(user_agent="aquametric_ai")
 try:
     loc = geolocator.geocode(loc_query)
     lat, lon = (loc.latitude, loc.longitude) if loc else (28.61, 77.20)
@@ -159,7 +159,7 @@ if st.button("RUN FULL SYSTEM DIAGNOSTIC"):
         st.subheader("📊 XAI: Explainable AI Feature Influence")
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(data_scaled)
-        
+
         # Binary Classification Patch
         if isinstance(shap_values, list):
             sv = shap_values[prediction].flatten()
@@ -174,7 +174,7 @@ if st.button("RUN FULL SYSTEM DIAGNOSTIC"):
         # 6. TREATMENT PHASES
         st.divider()
         st.subheader("🛠️ Professional Treatment Roadmap")
-        
+
         p1, p2, p3 = st.columns(3)
         with p1:
             st.info("**PHASE 1: Physical Mitigation**\n\nRemoving turbidity and large organic matter through coagulation and flocculation.")
@@ -190,4 +190,4 @@ st.divider()
 st.subheader("📜 Diagnostic History")
 st.dataframe(st.session_state.diagnostic_history, use_container_width=True)
 
-st.caption(f"AquaGuard AI Core v4.6 | {datetime.datetime.now().year}")
+st.caption(f"AquaMetric AI Core v4.6 | {datetime.datetime.now().year}")
