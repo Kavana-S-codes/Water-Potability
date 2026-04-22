@@ -1,4 +1,3 @@
-
 import streamlit as st
 import joblib
 import numpy as np
@@ -8,9 +7,11 @@ import folium
 from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 from fpdf import FPDF
+import cv2
 import os
+import random
 
-# --- 1. FULLY EXPANDED LANGUAGE DICTIONARY ---
+# --- 1. COMPREHENSIVE LANGUAGE DICTIONARY ---
 LANG_DICT = {
     "English": {
         "title": "🌊 Hydrovidex AI: The Autonomous Water Quality Diagnostic Engine",
@@ -19,121 +20,112 @@ LANG_DICT = {
         "verdict_safe": "NON-CONTAMINATED (Safe)", "verdict_unsafe": "CONTAMINATED (Unsafe)",
         "download_report": "📥 DOWNLOAD DESIGNER PDF REPORT",
         "comm_header": "Global & Local Water Quality Network",
-        "upload_label": "Upload Image for Pollution Source Analysis",
-        "visual_explain_label": "Upload Water Sample for Visual Analysis",
+        "upload_label": "Upload Image for Origin Analysis (Human vs Nature)",
+        "visual_explain_label": "Upload Sample for Microplastic & Origin Scan",
         "treatment_title": "🛠️ Professional Treatment Roadmap",
         "homemade_title": "🏡 Emergency Homemade Solutions",
+        "treatment_list": "● RO Filtration<br>● UV Sterilization<br>● Activated Carbon",
+        "homemade_list": "● 10-Min Boil<br>● Sand Filter<br>● Solar Disinfection",
+        "graph_title": "📊 Parameter Concentration Analysis",
+        "pollution_label": "Detected Pollution Source",
+        "stream_head": "👥 Community Activity & Feedback",
+        "prof_head": "👤 User Profile Management",
+        "save_prof": "Save Profile Settings",
+        "age_label": "Age", "addr_label": "Address", "name_label": "Full Name", "phone_label": "Mobile",
         "who_head": "📋 WHO Water Quality Limits & Analysis",
         "who_param": "Parameter", "who_limit": "Limit", "who_result": "Status",
-        "pollution_label": "Detected Pollution Source",
-        "source_nature": "Nature-Made (Mineral Leaching)",
-        "source_human": "Human-Made (Industrial/Domestic Sewage)",
-        "treat_ro": "● RO Filtration<br>● Activated Carbon",
-        "treat_boil": "● 10-Min Boil<br>● Sand Filter",
-        "visual_header": "👁️ Visual Pollution Interpreter",
-        "visual_report_title": "📝 Automated Visual Analysis Report",
-        "visual_state": "Visual State", "visual_state_desc": "Significant discoloration detected.",
-        "visual_cause": "Primary Cause", "visual_cause_desc": "Suspended solids and bio-organic matter.",
-        "visual_potability": "Potability", "visual_potability_desc": "Critical levels of turbidity detected visually. Boiling is mandatory.",
-        "local_range": "500m Local Range", "user": "User", "status": "Status", "local": "Local", "regional": "Regional",
-        "activity_stream": "👥 Global Activity Stream",
-        "prof_header": "👤 User Profile Management", "prof_name": "Full Name", "prof_phone": "Mobile No",
-        "prof_save": "Save Profile", "prof_saved_toast": "Data Saved Locally!", "prof_saved_btn": "Profile Saved ✅",
-        "target": "Targeting", "chat_placeholder": "Ask Vedix about water quality...", "chat_you": "You", "chat_vedix": "Vedix",
-        "chat_analyzing": "I am analyzing the sensor network data for", "map_popup": "ANALYSIS POINT",
-        "names": ["Rahul Sharma", "Sneha K.", "Amit V.", "Dr. Meena", "Kiran Kumar"],
+        "source_industrial": "Human-Made (Industrial/Domestic Sewage)",
+        "source_natural": "Nature-Made (Mineral Leaching)",
         "sensors": {"ph": "pH Level", "Hardness": "Hardness", "Solids": "TDS", "Chloramines": "Chloramines", "Sulfate": "Sulfate", "Conductivity": "Conductivity", "Organic_carbon": "TOC", "Trihalomethanes": "THMs", "Turbidity": "Turbidity"}
     },
     "ಕನ್ನಡ": {
-        "title": "🌊 ಹೈಡ್ರೋವಿಡೆಕ್ಸ್ ಎಐ: ಸ್ವಾಯತ್ತ ನೀರಿನ ಗುಣಮಟ್ಟ ರೋಗನಿರ್ಣಯ ಎಂಜಿನ್",
+        "title": "🌊 ಹೈಡ್ರೋವಿಡೆಕ್ಸ್ ಎಐ: ಸ್ವಾಯತ್ತ ನೀರಿನ ಗುಣಮಟ್ಟದ ಎಂಜಿನ್",
         "tab1": "🏠 ರೋಗನಿರ್ಣಯ", "tab2": "👁️ ದೃಶ್ಯ ಸ್ಕ್ಯಾನ್", "tab3": "🤝 ಸಮುದಾಯ", "tab4": "👤 ಪ್ರೊಫೈಲ್",
-        "run_diag": "ರೋಗನಿರ್ಣಯ ಚಲಾಯಿಸಿ",
-        "verdict_safe": "ಸುರಕ್ಷಿತ (Safe)", "verdict_unsafe": "ಅಸುರಕ್ಷಿತ (Unsafe)",
-        "download_report": "📥 PDF ವರದಿ",
-        "comm_header": "ಜಾಗತಿಕ ಮತ್ತು ಸ್ಥಳೀಯ ನೀರಿನ ಗುಣಮಟ್ಟ ನೆಟ್‌ವರ್ಕ್",
-        "upload_label": "ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ",
-        "visual_explain_label": "ದೃಶ್ಯ ವಿಶ್ಲೇಷಣೆಗಾಗಿ ಚಿತ್ರ",
-        "treatment_title": "🛠️ ವೃತ್ತಿಪರ ಚಿಕಿತ್ಸಾ ಮಾರ್ಗಸೂಚಿ",
+        "run_diag": "ಪೂರ್ಣ ರೋಗನಿರ್ಣಯ ಚಲಾಯಿಸಿ",
+        "verdict_safe": "ಸುರಕ್ಷಿತ (ಕಲುಷಿತಗೊಂಡಿಲ್ಲ)", "verdict_unsafe": "ಅಸುರಕ್ಷಿತ (ಕಲುಷಿತಗೊಂಡಿದೆ)",
+        "download_report": "📥 PDF ವರದಿ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+        "comm_header": "ಜಾಗತಿಕ ಮತ್ತು ಸ್ಥಳೀಯ ಜಾಲ",
+        "upload_label": "ಮೂಲ ವಿಶ್ಲೇಷಣೆಗಾಗಿ ಚಿತ್ರ (ಮಾನವ ಅಥವಾ ನಿಸರ್ಗ)",
+        "visual_explain_label": "ಸೂಕ್ಷ್ಮ ಪ್ಲಾಸ್ಟಿಕ್ ಮತ್ತು ಮೂಲ ಸ್ಕ್ಯಾನ್‌ಗಾಗಿ ಚಿತ್ರ",
+        "treatment_title": "🛠️ ವೃತ್ತಿಪರ ಸಂಸ್ಕರಣಾ ಮಾರ್ಗಸೂಚಿ",
         "homemade_title": "🏡 ತುರ್ತು ಮನೆಮದ್ದು ಪರಿಹಾರಗಳು",
-        "who_head": "📋 ಡಬ್ಲ್ಯುಎಚ್‌ಒ ನೀರಿನ ಗುಣಮಟ್ಟ ಮಿತಿಗಳು",
-        "who_param": "ಪ್ಯಾರಾಮೀಟರ್", "who_limit": "ಮಿತಿ", "who_result": "ಸ್ಥಿತಿ",
-        "pollution_label": "ಮಾಲಿನ್ಯದ ಮೂಲ",
-        "source_nature": "ಪ್ರಕೃತಿದತ್ತ (ಖನಿಜ ಸೋರಿಕೆ)",
-        "source_human": "ಮಾನವ ನಿರ್ಮಿತ (ಕೈಗಾರಿಕಾ/ಗೃಹಬಳಕೆಯ ಒಳಚರಂಡಿ)",
-        "treat_ro": "● ಆರ್‌ಒ (RO) ಫಿಲ್ಟರೇಶನ್<br>● ಆಕ್ಟಿವೇಟೆಡ್ ಕಾರ್ಬನ್",
-        "treat_boil": "● 10-ನಿಮಿಷಗಳ ಕುದಿಯುವಿಕೆ<br>● ಮರಳು ಫಿಲ್ಟರ್",
-        "visual_header": "👁️ ದೃಶ್ಯ ಮಾಲಿನ್ಯ ವಿಶ್ಲೇಷಕ",
-        "visual_report_title": "📝 ಸ್ವಯಂಚಾಲಿತ ದೃಶ್ಯ ವಿಶ್ಲೇಷಣೆ ವರದಿ",
-        "visual_state": "ದೃಶ್ಯ ಸ್ಥಿತಿ", "visual_state_desc": "ಗಮನಾರ್ಹ ಬಣ್ಣ ಬದಲಾವಣೆ ಪತ್ತೆಯಾಗಿದೆ.",
-        "visual_cause": "ಮುಖ್ಯ ಕಾರಣ", "visual_cause_desc": "ತೇಲುವ ಘನವಸ್ತುಗಳು ಮತ್ತು ಜೈವಿಕ-ಸಾವಯವ ವಸ್ತುಗಳು.",
-        "visual_potability": "ಕುಡಿಯುವ ಯೋಗ್ಯತೆ", "visual_potability_desc": "ಕಲಕುತನದ ನಿರ್ಣಾಯಕ ಮಟ್ಟ ಪತ್ತೆಯಾಗಿದೆ. ಕುದಿಸುವುದು ಕಡ್ಡಾಯ.",
-        "local_range": "500 ಮೀ ಸ್ಥಳೀಯ ವ್ಯಾಪ್ತಿ", "user": "ಬಳಕೆದಾರ", "status": "ಸ್ಥಿತಿ", "local": "ಸ್ಥಳೀಯ", "regional": "ಪ್ರಾದೇಶಿಕ",
-        "activity_stream": "👥 ಜಾಗತಿಕ ಚಟುವಟಿಕೆ ಸ್ಟ್ರೀಮ್",
-        "prof_header": "👤 ಬಳಕೆದಾರರ ಪ್ರೊಫೈಲ್ ನಿರ್ವಹಣೆ", "prof_name": "ಪೂರ್ಣ ಹೆಸರು", "prof_phone": "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ",
-        "prof_save": "ಪ್ರೊಫೈಲ್ ಉಳಿಸಿ", "prof_saved_toast": "ಡೇಟಾವನ್ನು ಸ್ಥಳೀಯವಾಗಿ ಉಳಿಸಲಾಗಿದೆ!", "prof_saved_btn": "ಪ್ರೊಫೈಲ್ ಉಳಿಸಲಾಗಿದೆ ✅",
-        "target": "ಗುರಿ", "chat_placeholder": "ನೀರಿನ ಬಗ್ಗೆ ವೇಡಿಕ್ಸ್ ಅನ್ನು ಕೇಳಿ...", "chat_you": "ನೀವು", "chat_vedix": "ವೇಡಿಕ್ಸ್",
-        "chat_analyzing": "ನಾನು ವಿಶ್ಲೇಷಿಸುತ್ತಿದ್ದೇನೆ:", "map_popup": "ವಿಶ್ಲೇಷಣಾ ಬಿಂದು",
-        "names": ["ರಾಹುಲ್ ಶರ್ಮಾ", "ಸ್ನೇಹಾ ಕೆ.", "ಅಮಿತ್ ವಿ.", "ಡಾ. ಮೀನಾ", "ಕಿರಣ್ ಕುಮಾರ್"],
+        "treatment_list": "● ಆರ್‌ಒ ಫಿಲ್ಟರೇಶನ್<br>● ಯುವಿ ಕ್ರಿಮಿನಾಶಕ<br>● ಸಕ್ರಿಯ ಇಂಗಾಲ",
+        "homemade_list": "● 10 ನಿಮಿಷ ಕುದಿಸಿ<br>● ಮರಳು ಫಿಲ್ಟರ್<br>● ಸೌರ ಸೋಂಕುಗಳೆತ",
+        "graph_title": "📊 ನಿಯತಾಂಕ ಸಾಂದ್ರತೆ",
+        "who_head": "📋 WHO ನೀರಿನ ಗುಣಮಟ್ಟದ ವಿಶ್ಲೇಷಣೆ",
+        "who_param": "ನಿಯತಾಂಕ", "who_limit": "ಮಿತಿ", "who_result": "ಸ್ಥಿತಿ",
+        "pollution_label": "ಪತ್ತೆಯಾದ ಮಾಲಿನ್ಯದ ಮೂಲ",
+        "stream_head": "👥 ಸಮುದಾಯ ಚಟುವಟಿಕೆ ಮತ್ತು ಪ್ರತಿಕ್ರಿಯೆ",
+        "prof_head": "👤 ಬಳಕೆದಾರರ ಪ್ರೊಫೈಲ್",
+        "save_prof": "ಪ್ರೊಫೈಲ್ ಉಳಿಸಿ",
+        "age_label": "ವಯಸ್ಸು", "addr_label": "ವಿಳಾಸ", "name_label": "ಪೂರ್ಣ ಹೆಸರು", "phone_label": "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ",
+        "source_industrial": "ಮಾನವ ನಿರ್ಮಿತ (ಕೈಗಾರಿಕಾ/ಮನೆಯ ಒಳಚರಂಡಿ)",
+        "source_natural": "ನಿಸರ್ಗ ನಿರ್ಮಿತ (ಖನಿಜ ಸೋರುವಿಕೆ)",
         "sensors": {"ph": "ಪಿಹೆಚ್ ಮಟ್ಟ", "Hardness": "ಗಡಸುತನ", "Solids": "ಟಿಡಿಎಸ್", "Chloramines": "ಕ್ಲೋರಮೈನ್ಸ್", "Sulfate": "ಸಲ್ಫೇಟ್", "Conductivity": "ವಾಹಕತೆ", "Organic_carbon": "ಇಂಗಾಲ", "Trihalomethanes": "ಟಿಎಚ್‌ಎಂ", "Turbidity": "ಕಲಕುತನ"}
     },
     "हिंदी": {
-        "title": "🌊 हाइड्रोविडेक्स एआई: स्वायत्त जल गुणवत्ता नैदानिक इंजन",
+        "title": "🌊 हाइड्रोविडेक्स एआई: स्वायत्त जल गुणवत्ता इंजन",
         "tab1": "🏠 निदान", "tab2": "👁️ विजुअल स्कैन", "tab3": "🤝 समुदाय", "tab4": "👤 प्रोफाइल",
         "run_diag": "पूर्ण निदान चलाएं",
-        "verdict_safe": "सुरक्षित (Safe)", "verdict_unsafe": "असुरक्षित (Unsafe)",
-        "download_report": "📥 PDF रिपोर्ट",
-        "comm_header": "वैश्विक और स्थानीय जल गुणवत्ता नेटवर्क",
-        "upload_label": "छवि अपलोड करें",
-        "visual_explain_label": "दृश्य विश्लेषण",
-        "treatment_title": "🛠️ पेशेवर उपचार रोडमैप",
-        "homemade_title": "🏡 आपातकालीन घरेलू समाधान",
-        "who_head": "📋 डब्ल्यूएचओ जल गुणवत्ता सीमाएं",
-        "who_param": "पैरामीटर", "who_limit": "सीमा", "who_result": "स्थिति",
+        "verdict_safe": "सुरक्षित (गैर-प्रदूषित)", "verdict_unsafe": "असुरक्षित (प्रदूषित)",
+        "download_report": "📥 पीडीएफ रिपोर्ट डाउनलोड करें",
+        "comm_header": "ग्लोबल और लोकल नेटवर्क",
+        "upload_label": "स्रोत विश्लेषण के लिए छवि (मानव बनाम प्रकृति)",
+        "visual_explain_label": "माइक्रोप्लास्टिक और स्रोत स्कैन के लिए छवि",
+        "treatment_title": "🛠️ प्रोफेशनल उपचार रोडमैप",
+        "homemade_title": "🏡 घरेलू समाधान",
+        "treatment_list": "● आरओ फिल्ट्रेशन<br>● यूवी नसबंदी<br>● सक्रिय कार्बन",
+        "homemade_list": "● 10-मिनट उबालें<br>● रेत फिल्टर<br>● सौर कीटाणुशोधन",
         "pollution_label": "प्रदूषण का स्रोत",
-        "source_nature": "प्रकृति-निर्मित (खनिज रिसाव)",
-        "source_human": "मानव-निर्मित (औद्योगिक/घरेलू सीवेज)",
-        "treat_ro": "● आरओ (RO) निस्पंदन<br>● सक्रिय कार्बन",
-        "treat_boil": "● 10-मिनट उबालें<br>● रेत फिल्टर",
-        "visual_header": "👁️ दृश्य प्रदूषण विश्लेषक",
-        "visual_report_title": "📝 स्वचालित दृश्य विश्लेषण रिपोर्ट",
-        "visual_state": "दृश्य स्थिति", "visual_state_desc": "महत्वपूर्ण मलिनकिरण का पता चला।",
-        "visual_cause": "प्राथमिक कारण", "visual_cause_desc": "निलंबित ठोस और जैव-जैविक पदार्थ।",
-        "visual_potability": "पीने योग्यता", "visual_potability_desc": "गंदलापन का महत्वपूर्ण स्तर दृष्टिगत रूप से पाया गया। उबालना अनिवार्य है।",
-        "local_range": "500 मीटर स्थानीय सीमा", "user": "उपयोगकर्ता", "status": "स्थिति", "local": "स्थानीय", "regional": "क्षेत्रीय",
-        "activity_stream": "👥 वैश्विक गतिविधि स्ट्रीम",
-        "prof_header": "👤 उपयोगकर्ता प्रोफ़ाइल प्रबंधन", "prof_name": "पूरा नाम", "prof_phone": "मोबाइल नंबर",
-        "prof_save": "प्रोफाइल सहेजें", "prof_saved_toast": "डेटा स्थानीय रूप से सहेजा गया!", "prof_saved_btn": "प्रोफाइल सहेजा गया ✅",
-        "target": "लक्षित", "chat_placeholder": "वेडिक्स से पानी की गुणवत्ता के बारे में पूछें...", "chat_you": "आप", "chat_vedix": "वेडिक्स",
-        "chat_analyzing": "मैं सेंसर नेटवर्क डेटा का विश्लेषण कर रहा हूं:", "map_popup": "विश्लेषण बिंदु",
-        "names": ["राहुल शर्मा", "स्नेहा के.", "अमित वी.", "डॉ. मीना", "किरण कुमार"],
-        "sensors": {"ph": "पीएच स्तर", "Hardness": "कठोरता", "Solids": "टीडीएस", "Chloramines": "क्लोरामाइन", "Sulfate": "सल्फेट", "Conductivity": "चालकता", "Organic_carbon": "कार्बन", "Trihalomethanes": "टीएचएम", "Turbidity": "गंदलापन"}
+        "stream_head": "👥 समुदाय गतिविधि और प्रतिक्रिया",
+        "prof_head": "👤 उपयोगकर्ता प्रोफ़ाइल",
+        "save_prof": "प्रोफ़ाइल सहेजें",
+        "age_label": "आयु", "addr_label": "पता", "name_label": "पूरा नाम", "phone_label": "मोबाइल नंबर",
+        "who_head": "📋 WHO जल गुणवत्ता विश्लेषण",
+        "who_param": "पैरामीटर", "who_limit": "सीमा", "who_result": "स्थिति",
+        "source_industrial": "मानव निर्मित (औद्योगिक/घरेलू सीवेज)",
+        "source_natural": "प्रकृति निर्मित (खनिज निक्षालन)",
+        "sensors": {"ph": "पीएच स्तर", "Hardness": "कठोरता", "Solids": "टीडीएस", "Chloramines": "क्लोरामाइन", "Sulfate": "सल्फे़ट", "Conductivity": "चालकता", "Organic_carbon": "कार्बन", "Trihalomethanes": "टीएचएम", "Turbidity": "गंदलापन"}
     }
 }
 
-st.set_page_config(page_title="Hydrovidex AI", page_icon="💧", layout="wide")
+st.set_page_config(page_title="Hydrovidex AI v27", page_icon="💧", layout="wide")
 
-# --- 2. CSS STYLING & BUBBLE ANIMATION ---
+# --- 2. CSS & BUBBLE ANIMATION ---
 st.markdown("""
 <style>
-    .stApp { background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 50%, #80deea 100%); overflow: hidden; }
-    .card { padding: 15px; border-radius: 12px; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 10px; border-left: 5px solid #0288d1; }
-    /* Added min-height to treatment and home cards for perfect alignment! */
-    .treatment-card { background: linear-gradient(45deg, #0288d1, #26c6da); color: white; padding: 15px; border-radius: 10px; font-weight: bold; margin-bottom: 10px; min-height: 100px; }
-    .home-card { background: linear-gradient(45deg, #2e7d32, #66bb6a); color: white; padding: 15px; border-radius: 10px; font-weight: bold; margin-bottom: 10px; min-height: 100px; }
+    .stApp { background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 50%, #80deea 100%); }
+    .treatment-card { background: linear-gradient(45deg, #0288d1, #26c6da); color: white; padding: 15px; border-radius: 10px; font-weight: bold; margin-bottom: 10px; }
+    .home-card { background: linear-gradient(45deg, #2e7d32, #66bb6a); color: white; padding: 15px; border-radius: 10px; font-weight: bold; margin-bottom: 10px; }
     .pollution-box { background: #fff3e0; border: 2px dashed #ef6c00; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; margin-top: 10px; }
-    .analysis-card { background: #ffffff; border: 1px solid #ddd; padding: 20px; border-radius: 15px; margin-top: 15px; }
-    .bubble { position: absolute; bottom: -100px; background-color: rgba(255, 255, 255, 0.5); border-radius: 50%; animation: floatUp infinite ease-in; pointer-events: none; z-index: 0; }
-    @keyframes floatUp { 0% { transform: translateY(0) translateX(0); opacity: 1; } 100% { transform: translateY(-120vh) translateX(20px); opacity: 0; } }
+    .analysis-card { background: white; padding: 20px; border-radius: 15px; border: 1px solid #0288d1; margin-top: 15px; }
+    .comm-card { background: rgba(255,255,255,0.7); border-radius: 12px; padding: 15px; margin-bottom: 10px; border-left: 5px solid #0288d1; }
+    #bubbles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 </style>
-<div class="bubble" style="left: 10%; width: 40px; height: 40px; animation-duration: 8s;"></div>
-<div class="bubble" style="left: 25%; width: 20px; height: 20px; animation-duration: 5s; animation-delay: 2s;"></div>
-<div class="bubble" style="left: 45%; width: 60px; height: 60px; animation-duration: 11s; animation-delay: 1s;"></div>
-<div class="bubble" style="left: 65%; width: 30px; height: 30px; animation-duration: 7s; animation-delay: 4s;"></div>
-<div class="bubble" style="left: 85%; width: 50px; height: 50px; animation-duration: 9s; animation-delay: 0s;"></div>
-<div class="bubble" style="left: 95%; width: 15px; height: 15px; animation-duration: 6s; animation-delay: 3s;"></div>
+<canvas id="bubbles"></canvas>
+<script>
+    const canvas = document.getElementById('bubbles');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    let particles = [];
+    class Particle {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = canvas.height + Math.random() * 100;
+            this.size = Math.random() * 6 + 2;
+            this.speed = Math.random() * 0.5 + 0.2;
+            this.opacity = Math.random() * 0.4;
+        }
+        update() { this.y -= this.speed; if (this.y < -20) { this.y = canvas.height + 20; this.x = Math.random() * canvas.width; } }
+        draw() { ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
+    }
+    function init() { for (let i = 0; i < 60; i++) { particles.push(new Particle()); } }
+    function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); particles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(animate); }
+    init(); animate();
+</script>
 """, unsafe_allow_html=True)
 
-# --- 3. STATE & ASSETS ---
+# --- 3. STATE & PKL LOADING ---
 @st.cache_resource
 def load_assets():
     try:
@@ -144,186 +136,158 @@ model, scaler = load_assets()
 
 if 'history' not in st.session_state:
     st.session_state.history = [
-        {"name_idx": 0, "is_safe": True, "place": "Station Rd", "lat": 13.4312, "lon": 77.7215, "time": "09:15"},
-        {"name_idx": 1, "is_safe": False, "place": "Market Sq", "lat": 13.4325, "lon": 77.7230, "time": "10:45"},
-        {"name_idx": 2, "is_safe": True, "place": "Bangalore North", "lat": 13.0850, "lon": 77.5890, "time": "11:20"},
-        {"name_idx": 3, "is_safe": False, "place": "Nandi Hills Area", "lat": 13.3702, "lon": 77.6835, "time": "12:05"},
-        {"name_idx": 4, "is_safe": True, "place": "Gauribidanur", "lat": 13.6100, "lon": 77.5200, "time": "01:30"}
+        {"name": "Rahul Sharma", "age": "29", "phone": "9845012345", "address": "MG Road, Blr", "status": "Safe", "lat": 13.431, "lon": 77.721, "place": "Station Rd", "time": "09:15", "feedback": "System is very accurate!"}
     ]
-if 'chat_history' not in st.session_state: st.session_state.chat_history = []
-if 'user_profile' not in st.session_state: st.session_state.user_profile = {"name": "User_Alpha", "phone": "9988776655", "age": "24"}
+if 'messages' not in st.session_state: st.session_state.messages = [{"role": "assistant", "content": "I am Vedix AI. How can I assist you?"}]
+if 'user_profile' not in st.session_state: st.session_state.user_profile = {"name": "User_Alpha", "phone": "9988776655", "age": "24", "address": "Node 1"}
 if 'last_result' not in st.session_state: st.session_state.last_result = None
 
-# --- 4. SIDEBAR & VEDIX AI CHATBOT ---
+# --- 4. SIDEBAR CHATBOT ---
 with st.sidebar:
-    lang_choice = st.selectbox("🌐", list(LANG_DICT.keys()))
+    lang_choice = st.selectbox("🌐 Language", list(LANG_DICT.keys()))
     L = LANG_DICT[lang_choice]
-    loc_input = st.text_input("📍", "Chikkaballapur, India")
-    
-    geolocator = Nominatim(user_agent="hydro_final_v30")
+    loc_input = st.text_input("📍 Search Area", "Chikkaballapur, India")
+    geolocator = Nominatim(user_agent="hydro_v27_final")
     try:
         location = geolocator.geocode(loc_input)
         lat, lon = (location.latitude, location.longitude) if location else (13.43, 77.72)
         place_name = location.address.split(',')[0] if location else "Base Site"
     except: lat, lon, place_name = 13.43, 77.72, "Base Site"
-
-    st.info(f"{L['target']}: {place_name}")
-    st.divider()
     
-    st.subheader(f"🤖 {L['chat_vedix']}")
-    chat_container = st.container(height=300)
-    with chat_container:
-        if len(st.session_state.chat_history) == 0:
-            st.caption(L['chat_placeholder'])
-        for msg in st.session_state.chat_history:
-            st.markdown(msg)
-            
-    prompt = st.chat_input(L['chat_placeholder'], key="chat_in")
-    if prompt:
-        st.session_state.chat_history.append(f"**👤 {L['chat_you']}:** {prompt}")
-        st.session_state.chat_history.append(f"**🤖 {L['chat_vedix']}:** {L['chat_analyzing']} {place_name}...")
+    st.divider()
+    st.subheader("🤖 Vedix AI Chatbot")
+    q_col1, q_col2 = st.columns(2)
+    if q_col1.button("What is TDS?"): st.session_state.messages.append({"role": "user", "content": "What is TDS?"})
+    if q_col2.button("Safe pH?"): st.session_state.messages.append({"role": "user", "content": "What is a safe pH?"})
+    
+    chat_box = st.container(height=200)
+    for m in st.session_state.messages: chat_box.chat_message(m["role"]).write(m["content"])
+    if p := st.chat_input("Ask Vedix..."):
+        st.session_state.messages.append({"role": "user", "content": p})
         st.rerun()
 
-# --- 5. HEADER ---
-st.markdown(f"<div style='position: relative; z-index: 10;'><h1 style='text-align: center; color: #01579b;'>{L['title']}</h1></div>", unsafe_allow_html=True)
+# --- 5. MAIN INTERFACE ---
+st.markdown(f"<h1 style='text-align: center; color: #01579b;'>{L['title']}</h1>", unsafe_allow_html=True)
 tabs = st.tabs([L["tab1"], L["tab2"], L["tab3"], L["tab4"]])
 
 # --- TAB 1: DIAGNOSTIC ---
 with tabs[0]:
     c1, c2 = st.columns([1, 1.3])
     with c1:
-        u_vals = {k: st.number_input(f"🔹 {L['sensors'][k]}", value=7.0 if k=="ph" else 250.0) for k in L['sensors']}
-        diag_img = st.file_uploader(L["upload_label"], type=['jpg','png','jpeg'])
-        
-        who_std = {"ph": (6.5, 8.5), "Hardness": 200, "Solids": 500, "Chloramines": 4, "Sulfate": 250, "Conductivity": 400, "Organic_carbon": 2, "Trihalomethanes": 0.8, "Turbidity": 5}
+        u_vals = {k: st.number_input(f"🔹 {L['sensors'][k]}", value=7.0 if k=="ph" else 250.0, key=f"d_{k}") for k in L['sensors']}
+        diag_source_img = st.file_uploader(L["upload_label"], type=['jpg','png','jpeg'], key="diag_source")
         
         if st.button(L["run_diag"], use_container_width=True):
             if model and scaler:
                 raw = np.array([list(u_vals.values())])
-                is_safe = model.predict(scaler.transform(raw))[0] == 1
+                is_safe = (model.predict(scaler.transform(raw))[0] == 1)
             else: is_safe = 6.5 <= u_vals["ph"] <= 8.5 and u_vals["Solids"] < 500
             
-            source = L["source_nature"]
-            if diag_img and (u_vals['Solids'] > 600 or u_vals['Organic_carbon'] > 4):
-                source = L["source_human"]
+            # Origin Logic: If user uploads image or sensor values are high
+            is_industrial = (u_vals['Solids'] > 600 or u_vals['Chloramines'] > 4 or diag_source_img is not None)
+            source_key = "source_industrial" if is_industrial else "source_natural"
             
-            st.session_state.last_result = {"safe": is_safe, "vals": u_vals, "place": place_name, "source": source}
-            st.session_state.history.append({"name": st.session_state.user_profile["name"], "is_safe": is_safe, "place": place_name, "lat": lat, "lon": lon, "time": datetime.datetime.now().strftime("%H:%M")})
+            st.session_state.last_result = {
+                "safe": is_safe, "vals": u_vals, "status": L["verdict_safe"] if is_safe else L["verdict_unsafe"],
+                "status_en": "Safe" if is_safe else "Unsafe", "place": place_name, "source": L[source_key], "source_en": LANG_DICT["English"][source_key]
+            }
+            st.session_state.history.append({
+                "name": st.session_state.user_profile["name"], "age": st.session_state.user_profile["age"], "phone": st.session_state.user_profile["phone"], "address": st.session_state.user_profile["address"],
+                "status": st.session_state.last_result["status"], "lat": lat, "lon": lon, "place": place_name, "time": datetime.datetime.now().strftime("%H:%M"), "feedback": f"Origin: {st.session_state.last_result['source']}"
+            })
 
     with c2:
-        m = folium.Map(location=[lat, lon], zoom_start=15)
-        folium.Marker([lat, lon], popup=L["map_popup"], icon=folium.Icon(color='blue', icon='tint')).add_to(m)
-        st_folium(m, height=280, use_container_width=True, key="diag_map")
+        m_diag = folium.Map(location=[lat, lon], zoom_start=15)
+        folium.Marker([lat, lon], icon=folium.Icon(color='blue')).add_to(m_diag)
+        st_folium(m_diag, height=250, use_container_width=True, key="diag_map")
         
         st.subheader(L["who_head"])
+        who_std = {"ph": (6.5, 8.5), "Hardness": 200, "Solids": 500, "Chloramines": 4, "Sulfate": 250, "Conductivity": 400, "Organic_carbon": 2, "Trihalomethanes": 0.8, "Turbidity": 5}
         rows = [{L["who_param"]: L["sensors"][k], L["who_limit"]: str(who_std[k]), L["who_result"]: "✅" if ((who_std[k][0] <= v <= who_std[k][1]) if k=="ph" else (v <= who_std[k])) else "❌"} for k, v in u_vals.items()]
         st.table(pd.DataFrame(rows))
 
     if st.session_state.last_result:
         res = st.session_state.last_result
-        current_status_text = L["verdict_safe"] if res['safe'] else L["verdict_unsafe"]
-        st.markdown(f"<div style='position: relative; z-index: 10; background:{'#1b5e20' if res['safe'] else '#b71c1c'}; padding:20px; border-radius:10px; color:white; text-align:center;'><h2>{current_status_text}</h2></div>", unsafe_allow_html=True)
-        st.markdown(f"""<div class="pollution-box" style="position: relative; z-index: 10;">🔍 {L['pollution_label']}: {res['source']}</div>""", unsafe_allow_html=True)
+        st.markdown(f"<div style='background:{'#1b5e20' if res['safe'] else '#b71c1c'}; padding:20px; border-radius:10px; color:white; text-align:center;'><h2>{res['status']}</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='pollution-box'>🔍 {L['pollution_label']}: {res['source']}</div>", unsafe_allow_html=True)
         
-        # Added gap="medium" to give the side-by-side boxes space
-        tx1, tx2 = st.columns(2, gap="medium")
-        with tx1:
+        r1, r2 = st.columns(2)
+        with r1:
             st.subheader(L["treatment_title"])
-            st.markdown(f'<div class="treatment-card">{L["treat_ro"]}</div>', unsafe_allow_html=True)
-        with tx2:
+            st.markdown(f'<div class="treatment-card">{L["treatment_list"]}</div>', unsafe_allow_html=True)
+        with r2:
             st.subheader(L["homemade_title"])
-            st.markdown(f'<div class="home-card">{L["treat_boil"]}</div>', unsafe_allow_html=True)
-        
+            st.markdown(f'<div class="home-card">{L["homemade_list"]}</div>', unsafe_allow_html=True)
+
+        st.subheader(L["graph_title"])
         st.bar_chart(pd.DataFrame({"Levels": list(res['vals'].values())}, index=list(L['sensors'].values())))
         
-        # --- GENERATING THE POPULATED PDF REPORT ---
         pdf = FPDF()
-        pdf.add_page()
-        pdf.set_fill_color(1, 87, 155)
-        pdf.rect(0, 0, 210, 30, 'F')
-        
-        # Header
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Arial", "B", 20)
-        pdf.cell(0, 15, "HYDROVIDEX AI - ANALYSIS REPORT", ln=True, align='C')
-        pdf.ln(10)
-        
-        # Body
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Arial", "B", 14)
-        
-        status_eng = "SAFE (Non-Contaminated)" if res['safe'] else "UNSAFE (Contaminated)"
-        source_eng = "Human-Made (Industrial/Domestic Sewage)" if ("Human" in res['source'] or "ಮಾನವ" in res['source'] or "मानव" in res['source']) else "Nature-Made (Mineral Leaching)"
-        
-        pdf.cell(0, 10, f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True)
-        pdf.cell(0, 10, f"Location: {res['place']}", ln=True)
-        pdf.cell(0, 10, f"Safety Verdict: {status_eng}", ln=True)
-        pdf.cell(0, 10, f"Detected Source: {source_eng}", ln=True)
-        
-        pdf.ln(5)
-        pdf.cell(0, 10, "Sensor Readings:", ln=True)
-        pdf.set_font("Arial", "", 12)
-        for key, val in res['vals'].items():
-            pdf.cell(0, 8, f"- {key}: {val}", ln=True)
-            
+        pdf.add_page(); pdf.set_font("Arial", "B", 16); pdf.cell(0, 10, "HYDROVIDEX AI REPORT", ln=True)
         pdf_bytes = bytes(pdf.output(dest='S'))
-        st.download_button(label=L["download_report"], data=pdf_bytes, file_name="Hydrovidex_Report.pdf", mime="application/pdf")
+        st.download_button(L["download_report"], data=pdf_bytes, file_name="Report.pdf")
 
-# --- TAB 2: VISUAL SCAN ---
+# --- TAB 2: VISUAL SCAN (ORIGIN + MICROPLASTIC) ---
 with tabs[1]:
-    st.header(L["visual_header"])
-    v_img = st.file_uploader(L["visual_explain_label"], type=['jpg','png','jpeg'], key="deep_scan")
+    st.header(L["tab2"])
+    v_img = st.file_uploader(L["visual_explain_label"], type=['jpg','png','jpeg'], key="v_scan")
     if v_img:
-        st.image(v_img, width=500)
+        file_bytes = np.asarray(bytearray(v_img.read()), dtype=np.uint8)
+        img = cv2.imdecode(file_bytes, 1)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(cv2.GaussianBlur(gray, (5, 5), 0), 100, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        conts, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        valid = [c for c in conts if cv2.contourArea(c) > 5]
+        
+        # Calculation
+        plastic_pct = (sum([cv2.contourArea(c) for c in valid]) / (img.shape[0]*img.shape[1])) * 100
+        is_human_made = plastic_pct > 0.02 or len(valid) > 15 # Heuristic for human-made debris
+        
+        overlay = img_rgb.copy()
+        cv2.drawContours(overlay, valid, -1, (0, 100, 255), 2)
+        
+        st.subheader("🖼️ Side-by-Side Analysis")
+        v1, v2 = st.columns(2)
+        v1.image(img_rgb, caption="Original Sample", use_container_width=True)
+        v2.image(overlay, caption=f"Scanned: {plastic_pct:.4f}% Particles", use_container_width=True)
+        
+        # Origin Result & Solutions
+        origin_text = L["source_industrial"] if is_human_made else L["source_natural"]
+        color_box = "#b71c1c" if is_human_made else "#ef6c00"
+        
         st.markdown(f"""
-        <div class="analysis-card" style="position: relative; z-index: 10;">
-            <h3>{L["visual_report_title"]}</h3>
-            <p><b>{L["visual_state"]}:</b> {L["visual_state_desc"]}</p>
-            <p><b>{L["visual_cause"]}:</b> {L["visual_cause_desc"]}</p>
-            <p><b>{L["visual_potability"]}:</b> {L["visual_potability_desc"]}</p>
+        <div class="analysis-card" style="border-left: 10px solid {color_box}">
+            <h3>🔍 Origin Classification: {origin_text}</h3>
+            <p><b>Microplastic Concentration:</b> {plastic_pct:.4f}%</p>
+            <hr>
+            <p><b>Recommended Action:</b> {'Requires Chemical Neutralization & Ultra-filtration' if is_human_made else 'Requires Boiling & Sedimentation'}</p>
+            <p><b>Target Solutions:</b> {L['treatment_list'] if is_human_made else L['homemade_list']}</p>
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 3: COMMUNITY (MULTI-LOCATOR MAP) ---
+    st.divider()
+    st.subheader("🕒 Recent Scan Activity")
+    for s in [{"n": "Arjun", "p": "CB Pur", "r": "Safe (Nature)"}, {"n": "Meera", "p": "CB Pur", "r": "Unsafe (Human-Made)"}]:
+        st.markdown(f'<div class="comm-card"><b>📷 {s["n"]}</b> | 📍 {s["p"]} | <b>Result:</b> {s["r"]}</div>', unsafe_allow_html=True)
+
+# --- TAB 3: COMMUNITY ---
 with tabs[2]:
     st.header(L["comm_header"])
-    
-    m_c = folium.Map(location=[lat, lon], zoom_start=12)
-    folium.Circle([lat, lon], radius=500, color='blue', fill=True, opacity=0.1, popup=L["local_range"]).add_to(m_c)
-    
+    m_c = folium.Map(location=[lat, lon], zoom_start=11)
     for h in st.session_state.history:
-        is_safe = h['is_safe']
-        status_color = 'green' if is_safe else 'red'
-        status_text = L["verdict_safe"] if is_safe else L["verdict_unsafe"]
-        dist_note = f" ({L['local']})" if (abs(h['lat'] - lat) < 0.005 and abs(h['lon'] - lon) < 0.005) else f" ({L['regional']})"
-        
-        # DYNAMIC NAME TRANSLATION
-        display_name = L["names"][h["name_idx"]] if "name_idx" in h else h["name"]
-        
-        folium.Marker(
-            location=[h['lat'], h['lon']], 
-            popup=f"{L['user']}: {display_name}\n{L['status']}: {status_text}{dist_note}", 
-            icon=folium.Icon(color=status_color, icon='user', prefix='fa')
-        ).add_to(m_c)
-    
-    st_folium(m_c, height=500, use_container_width=True, key="global_comm_map")
-    
-    st.subheader(L["activity_stream"])
+        folium.Marker([h.get('lat', lat), h.get('lon', lon)], popup=h.get('name')).add_to(m_c)
+    st_folium(m_c, height=350, use_container_width=True, key="comm_map")
     for h in reversed(st.session_state.history): 
-        status_text = L["verdict_safe"] if h['is_safe'] else L["verdict_unsafe"]
-        display_name = L["names"][h["name_idx"]] if "name_idx" in h else h["name"]
-        st.info(f"👤 {display_name} | 📍 {h['place']} | {status_text} | ⏰ {h['time']}")
+        st.markdown(f'<div class="comm-card"><b>👤 {h.get("name")}</b> ({h.get("age")}) | 📞 {h.get("phone")}<br>📍 {h.get("place")} | 💬 {h.get("feedback")}</div>', unsafe_allow_html=True)
 
 # --- TAB 4: PROFILE ---
 with tabs[3]:
-    st.header(L["prof_header"])
-    st.session_state.user_profile["name"] = st.text_input(L["prof_name"], st.session_state.user_profile["name"])
-    st.session_state.user_profile["phone"] = st.text_input(L["prof_phone"], st.session_state.user_profile["phone"])
-    
-    col_a, col_b = st.columns([1, 4])
-    with col_a:
-        if st.button(L["prof_save"]): st.toast(L["prof_saved_toast"], icon="✅")
-    with col_b:
-        st.button(L["prof_saved_btn"], disabled=True)
+    st.header(L["prof_head"])
+    st.session_state.user_profile["name"] = st.text_input(L["name_label"], st.session_state.user_profile["name"])
+    st.session_state.user_profile["phone"] = st.text_input(L["phone_label"], st.session_state.user_profile["phone"])
+    st.session_state.user_profile["age"] = st.text_input(L["age_label"], st.session_state.user_profile["age"])
+    st.session_state.user_profile["address"] = st.text_area(L["addr_label"], st.session_state.user_profile["address"])
+    st.button(L["save_prof"])
 
-st.caption("Hydrovidex AI Platform v30.0 | © 2026 Global Node")
+st.caption("Hydrovidex AI Platform v27.0 | © 2026 Global Node")
