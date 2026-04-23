@@ -1,12 +1,9 @@
 streamlit
-scikit-learn
 joblib
 numpy
 pandas
-shap 
-matplotlib
-fpdf2
-Pillow
-folium 
-streamlit-folium
 geopy
+folium
+streamlit-folium
+fpdf
+opencv-python-headless
