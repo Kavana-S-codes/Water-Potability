@@ -1,2 +1,2 @@
 fonts-freefont-ttf
-libgl1-mesa-glx
+libgl1
