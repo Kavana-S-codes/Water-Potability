@@ -9,7 +9,7 @@ from geopy.geocoders import Nominatim
 from fpdf import FPDF
 import cv2
 import os
-import random
+import random 
 
 # --- 1. COMPREHENSIVE LANGUAGE DICTIONARY ---
 LANG_DICT = {
@@ -224,7 +224,7 @@ with tabs[0]:
         
         pdf = FPDF()
         pdf.add_page(); pdf.set_font("Arial", "B", 16); pdf.cell(0, 10, "HYDROVIDEX AI REPORT", ln=True)
-        pdf_bytes = bytes(pdf.output(dest='S'))
+        pdf_bytes = pdf.output()
         st.download_button(L["download_report"], data=pdf_bytes, file_name="Report.pdf")
 
 # --- TAB 2: VISUAL SCAN (ORIGIN + MICROPLASTIC) ---
